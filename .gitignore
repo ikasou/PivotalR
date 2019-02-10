@@ -9,3 +9,5 @@ libadp.a
 *.Rproj*
 *.Rbuildignore*
 .Rproj.user
+*.o
+*.so

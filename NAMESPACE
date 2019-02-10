@@ -80,7 +80,7 @@ export("delete", "key", "key<-")
 
 exportMethods("is.factor")
 
-exportMethods("sort", "merge", "by", "summary")
+exportMethods("sort", "merge", "by", "summary", "over")
 
 exportMethods("==", "!=", "+", "-", "*", "/", "^", "%%", "%/%",
               ">", "<", ">=", "<=", "&", "|", "!")
@@ -97,7 +97,7 @@ export("db.objects", "db.existsObject")
 
 export("count")
 exportMethods("mean", "sum", "max", "min")
-export("sd", "var")
+export("sd", "var", "non_na_sd")
 
 exportMethods("sample")
 
