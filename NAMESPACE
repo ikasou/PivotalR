@@ -97,7 +97,7 @@ export("db.objects", "db.existsObject")
 
 export("count")
 exportMethods("mean", "sum", "max", "min")
-export("sd", "var", "non_na_sd")
+export("sd", "var", "non_na_sd", "reg_beta")
 
 exportMethods("sample")
 

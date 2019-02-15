@@ -3,12 +3,12 @@
 ## several aggregate methods, can be used with by
 ## -----------------------------------------------------------------------
 
-.apply.func.array <- function (x, func, vector, input.types, allow.bool,
-                               data.type, udt.name, inside, window = "", preserve.nonnum = FALSE)
+.apply.func.array <- function (x, func, vector, input.types, allow.bool, data.type, udt.name, 
+                               inside, window = "", preserve.nonnum = FALSE, extra_params = "")
 {
     x <- .expand.array(x)
-    y <- .sub.aggregate(x, func, vector, input.types, allow.bool,
-                        x@.col.data_type, x@.col.udt_name, inside, window, preserve.nonnum)
+    y <- .sub.aggregate(x, func, vector, input.types, allow.bool, x@.col.data_type, x@.col.udt_name, 
+                        inside, window, preserve.nonnum, extra_params)
     return (db.array(y))
 }
 
@@ -17,9 +17,9 @@
 ## support the operations on array columns
 .aggregate <- function (x, func, vector = TRUE, input.types = .num.types,
                         allow.bool = FALSE,
-                        data.type = "double precision",
-                        udt.name = "float8", inside = "",
-                        array.op = NULL, window = "", preserve.nonnum = FALSE)
+                        data.type = "double precision", udt.name = "float8", 
+                        inside = "", array.op = NULL, window = "", 
+                        preserve.nonnum = FALSE, extra_params = "")
 {
     if (vector && length(names(x)) != 1)
         stop(func, " only works on a single column!")
@@ -40,13 +40,13 @@
     if ((x[[1]])@.col.data_type != "array" && (length(names(x)) != 1 ||
                 x@.col.data_type != "array"))
         res <- .sub.aggregate(x[[1]], func, vector, input.types, allow.bool,
-                              data.type[1], udt.name[1], inside, window, preserve.nonnum)
+                              data.type[1], udt.name[1], inside, window, preserve.nonnum, extra_params)
     else {
         if (length(names(x)) == 1) z <- x
         else z <- x[[1]]
         if (is.null(array.op))
             res <- .apply.func.array(z, func, vector, input.types, allow.bool,
-                                     data.type[1], udt.name[1], inside, window, preserve.nonnum)
+                                     data.type[1], udt.name[1], inside, window, preserve.nonnum, extra_params)
         else {
             res <- z
             res@.expr <- paste(array.op, "(", res@.expr, ")", sep = "")
@@ -56,13 +56,13 @@
     }
     for (i in seq_len(l-1)+1) {
         if (x@.col.data_type[i] != "array") {
-            tmp <- .sub.aggregate(x[[i]], func, vector, input.types, allow.bool, data.type[i], udt.name[i], inside, window, preserve.nonnum)
+            tmp <- .sub.aggregate(x[[i]], func, vector, input.types, allow.bool, data.type[i], udt.name[i], inside, window, preserve.nonnum, extra_params)
             res[[tmp@.col.name]] <- tmp
         } else {
             if (is.null(array.op))
                 res[[col.name[i]]] <- .apply.func.array(x[[i]], func, vector,
-                                                        input.types, allow.bool,
-                                                        data.type[i], udt.name[i], inside, window, preserve.nonnum)
+                                                        input.types, allow.bool, data.type[i], udt.name[i], 
+                                                        inside, window, preserve.nonnum, extra_params)
             else {
                 z <- x[[i]]
                 z@.expr <- paste(array.op, "(", z@.expr, ")", sep = "")
@@ -79,8 +79,8 @@
 
 .sub.aggregate <- function (x, func, vector = TRUE, input.types = .num.types,
                             allow.bool = FALSE,
-                            data.type = "double precision",
-                            udt.name = "float8", inside = "", window = "", preserve.nonnum = FALSE)
+                            data.type = "double precision", udt.name = "float8",
+                            inside = "", window = "", preserve.nonnum = FALSE, extra_params = "")
 {
     cast.bool <- rep("", length(names(x)))
     prebra <- ""
@@ -95,7 +95,7 @@
     if (window == "") overW <- "" else overW <- " over W"
     col.name <- paste(names(x), "_", func, sep = "")
     if (is(x, "db.data.frame")) {
-        expr <- paste(func, "(\"", inside, names(x), "\"", cast.bool, ")", overW, sep = "")
+        expr <- paste(func, "(\"", inside, names(x), "\"", cast.bool, extra_params, ")", overW, sep = "")
         if (!is.null(input.types)) {
             for (i in seq_len(length(expr)))
                 if (!(x@.col.data_type[i] %in% input.types)) {
@@ -111,13 +111,13 @@
         where.str <- ""
         where <- ""
     } else {
-        expr <- paste(func, "(", prebra, inside, x@.expr, apbra, cast.bool, ")", overW, sep = "")
+        expr <- paste(func, "(", prebra, inside, x@.expr, apbra, cast.bool, extra_params, ")", overW, sep = "")
         if (!is.null(input.types)) {
             for (i in seq_len(length(expr)))
                 if (! (x@.col.data_type[i] %in% input.types)) {
                     if (allow.bool && x@.col.data_type[i] == "boolean") next
                     if(!preserve.nonnum) expr[i] <- paste("NULL::", x@.col.data_type[i], sep = "")
-                    else { expr[i] <- paste("\"", names(x)[i], "\"", sep=""); col.name[i] <- names(x)[i] }
+                    else { expr[i] <- x@.expr[i]; col.name[i] <- names(x)[i] }
                     data.type[i] <- x@.col.data_type[i]
                     udt.name[i] <- x@.col.udt_name[i]
                 }
@@ -285,6 +285,29 @@ setMethod (
 
 ## -----------------------------------------------------------------------
 
+## -----------------------------------------------------------------------
+
+setGeneric ("reg_beta", signature = "x", 
+            def = function (x, ..., w = "", preserve.nonnum = FALSE) standardGeneric("reg_beta"))
+
+setMethod(
+  "reg_beta",
+  signature(x = "db.obj"),
+  function (x, ..., w = "", preserve.nonnum = FALSE) {
+    extras <- list(...); extra_params <- ""
+    if (length(extras) > 0) {
+      extras[1] <- paste0(",'", extras[1], "'", collapse = "")
+      extra_params <- paste0(extras, collapse = ",")
+    }
+    res <- .aggregate(x, "reg_beta", FALSE, .num.types, TRUE,
+          "double precision", "float8", window = w, preserve.nonnum = preserve.nonnum, 
+          extra_params = ifelse(length(list(...))==0, "", extra_params))
+    res@.is.agg <- TRUE
+    res
+  },
+  valueClass = "db.Rquery")
+
+## -----------------------------------------------------------------------
 setGeneric ("var", signature = "x",
             def = function (x, y = NULL, na.rm = FALSE, use, w = "", preserve.nonnum = FALSE) {
                 if (!is(x, "db.obj")) {

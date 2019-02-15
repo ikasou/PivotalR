@@ -7,7 +7,7 @@ setGeneric("over", def = function (data, ..., W = "", simplify = TRUE)
 
 setMethod("over",
           signature(data = "db.obj"),
-          function (data, INDICES, FUN, ..., W = "", simplify = TRUE) {
+          function (data, INDICES, ORDERBY, FUN, ..., W = "", simplify = TRUE) {
               
               if (is.null(INDICES)) return (FUN(data, ..., w = W, preserve.nonnum = TRUE))
               if (is.list(INDICES))
@@ -69,10 +69,10 @@ setMethod("over",
                           where.str <- ""
                   }
                   
-                  grp.expr <- character(0)
-                  grp.col.name <- character(0)
-                  grp.col.data_type <- character(0)
-                  grp.col.udt_name <- character(0)
+                  part.expr <- character(0)
+                  part.col.name <- character(0)
+                  part.col.data_type <- character(0)
+                  part.col.udt_name <- character(0)
                   if (!is.null(INDICES)) {
                       by.name <- character(0)
                       if (!is.list(INDICES)) INDICES <- list(INDICES)
@@ -83,23 +83,50 @@ setMethod("over",
                           for (j in seq_len(length(INDICES[[i]]@.expr))) {
                               if (! INDICES[[i]]@.expr[j] %in% by.name) {
                                   by.name <- c(by.name, INDICES[[i]]@.expr[j])
-                                  grp.col.name <- c(grp.col.name, INDICES[[i]]@.col.name[j])
-                                  grp.col.data_type <- c(grp.col.data_type, INDICES[[i]]@.col.data_type[j])
-                                  grp.col.udt_name <- c(grp.col.udt_name, INDICES[[i]]@.col.udt_name[j])
+                                  part.col.name <- c(part.col.name, INDICES[[i]]@.col.name[j])
+                                  part.col.data_type <- c(part.col.data_type, INDICES[[i]]@.col.data_type[j])
+                                  part.col.udt_name <- c(part.col.udt_name, INDICES[[i]]@.col.udt_name[j])
                               }
                           }
                       }
                       ## by.name <- unique(by.name)
-                      grp.expr <- by.name
-                      parent <- paste(parent, where.str, " window W as (",
-                        ifelse(grp.expr != "", 
-                            paste("partition by ", paste(by.name, collapse = ", ", sep = ""), " ", sep = ""),
-                            ""), 
-                        W, ")", sep = "")
-                      where.str <- ""
-                      where <- ""
-                      src <- parent
+                      part.expr <- by.name
                   }
+                  ordr.expr <- character(0)
+                  ordr.col.name <- character(0)
+                  ordr.col.data_type <- character(0)
+                  ordr.col.udt_name <- character(0)
+                  if (!is.null(ORDERBY)) {
+                    ordrby.name <- character(0)
+                    if (!is.list(ORDERBY)) ORDERBY <- list(ORDERBY)
+                    for (i in seq_len(length(ORDERBY))) {
+                      if (!is(ORDERBY[[i]], "db.Rquery") ||
+                          ORDERBY[[i]]@.parent != parent)
+                        stop("Only objects derived from the same table can order each other!")
+                      for (j in seq_len(length(ORDERBY[[i]]@.expr))) {
+                        if (! ORDERBY[[i]]@.expr[j] %in% by.name) {
+                          ordrby.name <- c(ordrby.name, ORDERBY[[i]]@.expr[j])
+                          ordr.col.name <- c(ordr.col.name, ORDERBY[[i]]@.col.name[j])
+                          ordr.col.data_type <- c(ordr.col.data_type, ORDERBY[[i]]@.col.data_type[j])
+                          ordr.col.udt_name <- c(ordr.col.udt_name, ORDERBY[[i]]@.col.udt_name[j])
+                        }
+                      }
+                    }
+                    ## ordrby.name <- unique(ordrby.name)
+                    ordr.expr <- ordrby.name
+                  }
+                  parent <- paste(parent, where.str, " window W as (",
+                    ifelse(part.expr != "", 
+                        paste("partition by ", paste(by.name, collapse = ", ", sep = ""), " ", sep = ""),
+                        ""), 
+                    ifelse(ordr.expr != "", 
+                           paste("order by ", paste(ordrby.name, collapse = ", ", sep = ""), " ", sep = ""),
+                           ""), 
+                    W, ")", sep = "")
+                  where.str <- ""
+                  where <- ""
+                  src <- parent
+                  
 
                   tmp <- FUN(data, ..., w = W, preserve.nonnum = TRUE)
                   
@@ -108,10 +135,10 @@ setMethod("over",
                   col.data_type <- tmp@.col.data_type
                   col.udt_name <- tmp@.col.udt_name
                   
-                  expr <- c(grp.expr, expr)
-                  col.name <- c(grp.col.name, col.name)
-                  col.data_type <- c(grp.col.data_type, col.data_type)
-                  col.udt_name <- c(grp.col.udt_name, col.udt_name)
+                  expr <- c(part.expr, ordr.expr, expr)
+                  col.name <- c(part.col.name, ordr.col.name, col.name)
+                  col.data_type <- c(part.col.data_type, ordr.col.data_type, col.data_type)
+                  col.udt_name <- c(part.col.udt_name, ordr.col.udt_name, col.udt_name)
                   
                   content <- paste("select ",
                                    paste(expr, paste("\"", col.name, "\"", sep = ""),
