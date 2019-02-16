@@ -49,7 +49,7 @@ setMethod("over",
                       
                       use <- get.piece(data, as.character(indx), w)
                       rst[[count+1]] <- list(index = vals[i,],
-                                             result = FUN(use, w = W))
+                                             result = FUN(use, ..., w = W, preserve.nonnum = TRUE))
                       count <- count + 1
                   }
                   return (rst)
